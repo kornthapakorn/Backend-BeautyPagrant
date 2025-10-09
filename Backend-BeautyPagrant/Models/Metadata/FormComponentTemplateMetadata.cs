@@ -12,14 +12,14 @@ namespace Backend_BeautyPagrant.Models
 
                 switch (dto.ComponentType)
                 {
-                    case "singleselection":
+                    case "singleSelection":
                         SingleSelection single = SingleSelection.CreateFromDto(dto.SingleSelection!, userName);
                         context.SingleSelections.Add(single);
                         context.SaveChanges();
                         createdId = single.Id;
                         break;
 
-                    case "textfield":
+                    case "textField":
                         TextField textField = Models.TextField.CreateFromDto(dto.TextField!, userName);
                         context.TextFields.Add(textField);
                         context.SaveChanges();
@@ -40,21 +40,21 @@ namespace Backend_BeautyPagrant.Models
                         createdId = birth.Id;
                         break;
 
-                    case "imageupload":
+                    case "imageUpload":
                         ImageUpload img = ImageUpload.CreateFromDto(dto.ImageUpload!, userName);
                         context.ImageUploads.Add(img);
                         context.SaveChanges();
                         createdId = img.Id;
                         break;
 
-                    case "imageuploadwithimagecontent":
+                    case "imageUploadWithImageContent":
                         ImageUploadWithImageContent img2 = ImageUploadWithImageContent.CreateFromDto(dto.ImageUploadWithImageContent!, userName);
                         context.ImageUploadWithImageContents.Add(img2);
                         context.SaveChanges();
                         createdId = img2.Id;
                         break;
 
-                    case "formbutton":
+                    case "formButton":
                         FormButton button = FormButton.CreateFromDto(dto.FormButton!, userName);
                         context.FormButtons.Add(button);
                         context.SaveChanges();
@@ -66,13 +66,13 @@ namespace Backend_BeautyPagrant.Models
                 {
                     Form = form,
                     ComponentType = dto.ComponentType,
-                    SingleSelectionId = (dto.ComponentType == "singleselection") ? createdId : null,
-                    TextField = (dto.ComponentType == "textfield") ? createdId : null,
+                    SingleSelectionId = (dto.ComponentType == "singleSelection") ? createdId : null,
+                    TextField = (dto.ComponentType == "textField") ? createdId : null,
                     DateId = (dto.ComponentType == "date") ? createdId : null,
-                    BirthDateId = (dto.ComponentType == "birthdate") ? createdId : null,
-                    ImageUploadId = (dto.ComponentType == "imageupload") ? createdId : null,
-                    ImageUploadWithImageContentId = (dto.ComponentType == "imageuploadwithimagecontent") ? createdId : null,
-                    FormButtonId = (dto.ComponentType == "formbutton") ? createdId : null
+                    BirthDateId = (dto.ComponentType == "birthDate") ? createdId : null,
+                    ImageUploadId = (dto.ComponentType == "imageUpload") ? createdId : null,
+                    ImageUploadWithImageContentId = (dto.ComponentType == "imageUploadWithImageContent") ? createdId : null,
+                    FormButtonId = (dto.ComponentType == "formButton") ? createdId : null
                 }.WithCreateAudit(userName);
 
                 context.FormComponentTemplates.Add(comp);

@@ -1,0 +1,29 @@
+version: "3.9"
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Backend-BeautyPagrant/Dockerfile   
+    container_name: backend-beautypagrant
+    ports:
+      - "8080:8080"   
+    environment:
+      ASPNETCORE_ENVIRONMENT: "Development"
+      ASPNETCORE_URLS: "http://+:8080"
+      ConnectionStrings__DefaultConnection: "Server=sqlserver,1433;Database=BeautyPagrant;User ID=sa;Password=YourStrong!Passw0rd;Encrypt=False;TrustServerCertificate=True"
+    depends_on:
+      - sqlserver
+
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: sqlserver
+    ports:
+      - "1433:1433"
+    environment:
+      ACCEPT_EULA: "Y"
+      SA_PASSWORD: "YourStrong!Passw0rd"
+    volumes:
+      - sql_data:/var/opt/mssql
+
+volumes:
+  sql_data:
