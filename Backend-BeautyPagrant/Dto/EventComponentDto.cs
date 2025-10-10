@@ -120,7 +120,10 @@
         public string? Url { get; set; }
     }
 
-    public class SectionDto { }
+    public class SectionDto 
+    {
+        public List<EventComponentDto> Components { get; set; } = new List<EventComponentDto>();
+    }
 
     public class TableWithTopicAndDescDto
     {

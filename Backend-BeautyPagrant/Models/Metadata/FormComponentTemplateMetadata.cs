@@ -1,25 +1,32 @@
 ﻿using System.Runtime.CompilerServices;
+using System.Collections.Generic;
+using System.Linq;
 using Backend_BeautyPagrant.Dto;
+
 namespace Backend_BeautyPagrant.Models
 {
     public partial class FormComponentTemplate
     {
+        // ==============================
+        // CREATE
+        // ==============================
         public static void Create(BeautyPagrantContext context, FormTemplate form, List<FormComponentTemplateDto> dtoList, string userName)
         {
             foreach (FormComponentTemplateDto dto in dtoList)
             {
+                string componentType = (dto.ComponentType ?? string.Empty).ToLowerInvariant();
                 int? createdId = null;
 
-                switch (dto.ComponentType)
+                switch (componentType)
                 {
-                    case "singleSelection":
+                    case "singleselection":
                         SingleSelection single = SingleSelection.CreateFromDto(dto.SingleSelection!, userName);
                         context.SingleSelections.Add(single);
                         context.SaveChanges();
                         createdId = single.Id;
                         break;
 
-                    case "textField":
+                    case "textfield":
                         TextField textField = Models.TextField.CreateFromDto(dto.TextField!, userName);
                         context.TextFields.Add(textField);
                         context.SaveChanges();
@@ -33,56 +40,66 @@ namespace Backend_BeautyPagrant.Models
                         createdId = date.Id;
                         break;
 
-                    case "birthDate":
+                    case "birthdate":
                         BirthDate birth = BirthDate.CreateFromDto(dto.BirthDate!, userName);
                         context.BirthDates.Add(birth);
                         context.SaveChanges();
                         createdId = birth.Id;
                         break;
 
-                    case "imageUpload":
+                    case "imageupload":
                         ImageUpload img = ImageUpload.CreateFromDto(dto.ImageUpload!, userName);
                         context.ImageUploads.Add(img);
                         context.SaveChanges();
                         createdId = img.Id;
                         break;
 
-                    case "imageUploadWithImageContent":
+                    case "imageuploadwithimagecontent":
                         ImageUploadWithImageContent img2 = ImageUploadWithImageContent.CreateFromDto(dto.ImageUploadWithImageContent!, userName);
                         context.ImageUploadWithImageContents.Add(img2);
                         context.SaveChanges();
                         createdId = img2.Id;
                         break;
 
-                    case "formButton":
+                    case "formbutton":
                         FormButton button = FormButton.CreateFromDto(dto.FormButton!, userName);
                         context.FormButtons.Add(button);
                         context.SaveChanges();
                         createdId = button.Id;
                         break;
+
+                    default:
+                        continue;
                 }
 
                 FormComponentTemplate comp = new FormComponentTemplate
                 {
                     Form = form,
-                    ComponentType = dto.ComponentType,
-                    SingleSelectionId = (dto.ComponentType == "singleSelection") ? createdId : null,
-                    TextField = (dto.ComponentType == "textField") ? createdId : null,
-                    DateId = (dto.ComponentType == "date") ? createdId : null,
-                    BirthDateId = (dto.ComponentType == "birthDate") ? createdId : null,
-                    ImageUploadId = (dto.ComponentType == "imageUpload") ? createdId : null,
-                    ImageUploadWithImageContentId = (dto.ComponentType == "imageUploadWithImageContent") ? createdId : null,
-                    FormButtonId = (dto.ComponentType == "formButton") ? createdId : null
+                    ComponentType = componentType, // เก็บเป็นตัวเล็กเสมอ
+
+                    SingleSelectionId = (componentType == "singleselection") ? createdId : null,
+                    TextField = (componentType == "textfield") ? createdId : null,
+                    DateId = (componentType == "date") ? createdId : null,
+                    BirthDateId = (componentType == "birthdate") ? createdId : null,
+                    ImageUploadId = (componentType == "imageupload") ? createdId : null,
+                    ImageUploadWithImageContentId = (componentType == "imageuploadwithimagecontent") ? createdId : null,
+                    FormButtonId = (componentType == "formbutton") ? createdId : null
                 }.WithCreateAudit(userName);
 
                 context.FormComponentTemplates.Add(comp);
+                context.SaveChanges();
             }
         }
+
+        // ==============================
+        // UPDATE
+        // ==============================
         public void Update(FormComponentTemplateDto dto, string userName)
         {
-            ComponentType = dto.ComponentType;
+            string componentType = (dto.ComponentType ?? string.Empty).ToLowerInvariant();
+            ComponentType = componentType;
 
-            switch (dto.ComponentType)
+            switch (componentType)
             {
                 case "singleselection":
                     SingleSelection.Update(this, dto, userName);
@@ -111,11 +128,15 @@ namespace Backend_BeautyPagrant.Models
                 case "formbutton":
                     FormButton.Update(this, dto, userName);
                     break;
+
+                default:
+                    break;
             }
 
             this.WithUpdateAudit(userName);
         }
-        public static void Update(BeautyPagrantContext context,FormTemplate form,List<FormComponentTemplateDto> dtoList,string userName)
+
+        public static void Update(BeautyPagrantContext context, FormTemplate form, List<FormComponentTemplateDto> dtoList, string userName)
         {
             List<FormComponentTemplate> existingComponents = context.FormComponentTemplates
                 .Where(c => c.Form.Id == form.Id && !c.IsDelete)
@@ -123,8 +144,7 @@ namespace Backend_BeautyPagrant.Models
 
             foreach (FormComponentTemplateDto dto in dtoList)
             {
-                FormComponentTemplate existing = existingComponents
-                    .FirstOrDefault(c => c.Id == dto.Id);
+                FormComponentTemplate existing = existingComponents.FirstOrDefault(c => c.Id == dto.Id);
 
                 if (existing != null)
                 {
@@ -136,136 +156,223 @@ namespace Backend_BeautyPagrant.Models
                 }
             }
 
-            HashSet<int> dtoIds = new HashSet<int>(
-                dtoList.Select(d => d.Id)
-            );
+            HashSet<int> dtoIds = new HashSet<int>(dtoList.Select(d => d.Id));
 
             foreach (FormComponentTemplate old in existingComponents)
             {
                 if (!dtoIds.Contains(old.Id))
                 {
-                    old.Delete(userName);
+                    // เดิม: old.Delete(userName);
+                    old.Delete(context, userName); // ✅ ให้ cascade ลูกแม้ nav ไม่ได้โหลด
                 }
             }
+
+
+            context.SaveChanges();
         }
+
+        // ==============================
+        // DUPLICATE  (โหลดลูกจาก FK ถ้า nav ว่าง)
+        // ==============================
         public static void Duplicate(BeautyPagrantContext context, FormTemplate newForm, FormComponentTemplate original, string userName)
         {
+            if (original == null || original.IsDelete) return;
+
+            string type = (original.ComponentType ?? string.Empty).ToLowerInvariant();
             int? createdId = null;
 
-            switch (original.ComponentType)
+            switch (type)
             {
-                case "SingleSelection":
-                    if (original.SingleSelection != null)
+                case "singleselection":
                     {
-                        SingleSelection newSingle = original.SingleSelection.Duplicate(userName);
-                        context.SingleSelections.Add(newSingle);
-                        context.SaveChanges();
-                        createdId = newSingle.Id;
+                        SingleSelection src = original.SingleSelection
+                            ?? (original.SingleSelectionId.HasValue
+                                ? context.SingleSelections.FirstOrDefault(x => x.Id == original.SingleSelectionId.Value && !x.IsDelete)
+                                : null);
+                        if (src != null)
+                        {
+                            SingleSelection newSingle = src.Duplicate(userName);
+                            context.SingleSelections.Add(newSingle);
+                            context.SaveChanges();
+                            createdId = newSingle.Id;
+                        }
+                        break;
                     }
-                    break;
 
-                case "TextField":
-                    if (original.TextFieldNavigation != null)
+                case "textfield":
                     {
-                        TextField newTextField = original.TextFieldNavigation.Duplicate(userName);
-                        context.TextFields.Add(newTextField);
-                        context.SaveChanges();
-                        createdId = newTextField.Id;
+                        TextField src = original.TextFieldNavigation
+                            ?? (original.TextField.HasValue
+                                ? context.TextFields.FirstOrDefault(x => x.Id == original.TextField.Value && !x.IsDelete)
+                                : null);
+                        if (src != null)
+                        {
+                            TextField newTextField = src.Duplicate(userName);
+                            context.TextFields.Add(newTextField);
+                            context.SaveChanges();
+                            createdId = newTextField.Id;
+                        }
+                        break;
                     }
-                    break;
 
-                case "Date":
-                    if (original.Date != null)
+                case "date":
                     {
-                        Date newDate = original.Date.Duplicate(userName);
-                        context.Dates.Add(newDate);
-                        context.SaveChanges();
-                        createdId = newDate.Id;
+                        Date src = original.Date
+                            ?? (original.DateId.HasValue
+                                ? context.Dates.FirstOrDefault(x => x.Id == original.DateId.Value && !x.IsDelete)
+                                : null);
+                        if (src != null)
+                        {
+                            Date newDate = src.Duplicate(userName);
+                            context.Dates.Add(newDate);
+                            context.SaveChanges();
+                            createdId = newDate.Id;
+                        }
+                        break;
                     }
-                    break;
 
-                case "BirthDate":
-                    if (original.BirthDate != null)
+                case "birthdate":
                     {
-                        BirthDate newBirth = original.BirthDate.Duplicate(userName);
-                        context.BirthDates.Add(newBirth);
-                        context.SaveChanges();
-                        createdId = newBirth.Id;
+                        BirthDate src = original.BirthDate
+                            ?? (original.BirthDateId.HasValue
+                                ? context.BirthDates.FirstOrDefault(x => x.Id == original.BirthDateId.Value && !x.IsDelete)
+                                : null);
+                        if (src != null)
+                        {
+                            BirthDate newBirth = src.Duplicate(userName);
+                            context.BirthDates.Add(newBirth);
+                            context.SaveChanges();
+                            createdId = newBirth.Id;
+                        }
+                        break;
                     }
-                    break;
 
-                case "ImageUpload":
-                    if (original.ImageUpload != null)
+                case "imageupload":
                     {
-                        ImageUpload newImg = original.ImageUpload.Duplicate(userName);
-                        context.ImageUploads.Add(newImg);
-                        context.SaveChanges();
-                        createdId = newImg.Id;
+                        ImageUpload src = original.ImageUpload
+                            ?? (original.ImageUploadId.HasValue
+                                ? context.ImageUploads.FirstOrDefault(x => x.Id == original.ImageUploadId.Value && !x.IsDelete)
+                                : null);
+                        if (src != null)
+                        {
+                            ImageUpload newImg = src.Duplicate(userName);
+                            context.ImageUploads.Add(newImg);
+                            context.SaveChanges();
+                            createdId = newImg.Id;
+                        }
+                        break;
                     }
-                    break;
 
-                case "ImageUploadWithImageContent":
-                    if (original.ImageUploadWithImageContent != null)
+                case "imageuploadwithimagecontent":
                     {
-                        ImageUploadWithImageContent newImgWith = original.ImageUploadWithImageContent.Duplicate(userName);
-                        context.ImageUploadWithImageContents.Add(newImgWith);
-                        context.SaveChanges();
-                        createdId = newImgWith.Id;
+                        ImageUploadWithImageContent src = original.ImageUploadWithImageContent
+                            ?? (original.ImageUploadWithImageContentId.HasValue
+                                ? context.ImageUploadWithImageContents.FirstOrDefault(x => x.Id == original.ImageUploadWithImageContentId.Value && !x.IsDelete)
+                                : null);
+                        if (src != null)
+                        {
+                            ImageUploadWithImageContent newImgWith = src.Duplicate(userName);
+                            context.ImageUploadWithImageContents.Add(newImgWith);
+                            context.SaveChanges();
+                            createdId = newImgWith.Id;
+                        }
+                        break;
                     }
-                    break;
 
-                case "FormButton":
-                    if (original.FormButton != null)
+                case "formbutton":
                     {
-                        FormButton newButton = original.FormButton.Duplicate(userName);
-                        context.FormButtons.Add(newButton);
-                        context.SaveChanges();
-                        createdId = newButton.Id;
+                        FormButton src = original.FormButton
+                            ?? (original.FormButtonId.HasValue
+                                ? context.FormButtons.FirstOrDefault(x => x.Id == original.FormButtonId.Value && !x.IsDelete)
+                                : null);
+                        if (src != null)
+                        {
+                            FormButton newButton = src.Duplicate(userName);
+                            context.FormButtons.Add(newButton);
+                            context.SaveChanges();
+                            createdId = newButton.Id;
+                        }
+                        break;
                     }
-                    break;
 
+                default:
+                    break;
             }
 
             FormComponentTemplate copy = new FormComponentTemplate
             {
                 Form = newForm,
-                ComponentType = original.ComponentType,
-                SingleSelectionId = original.ComponentType == "SingleSelection" ? createdId : null,
-                TextField = original.ComponentType == "TextField" ? createdId : null,
-                DateId = original.ComponentType == "Date" ? createdId : null,
-                BirthDateId = original.ComponentType == "BirthDate" ? createdId : null,
-                ImageUploadId = original.ComponentType == "ImageUpload" ? createdId : null,
-                ImageUploadWithImageContentId = original.ComponentType == "ImageUploadWithImageContent" ? createdId : null,
-                FormButtonId = original.ComponentType == "FormButton" ? createdId : null
+                ComponentType = type,
+
+                SingleSelectionId = (type == "singleselection") ? createdId : null,
+                TextField = (type == "textfield") ? createdId : null,
+                DateId = (type == "date") ? createdId : null,
+                BirthDateId = (type == "birthdate") ? createdId : null,
+                ImageUploadId = (type == "imageupload") ? createdId : null,
+                ImageUploadWithImageContentId = (type == "imageuploadwithimagecontent") ? createdId : null,
+                FormButtonId = (type == "formbutton") ? createdId : null
             }.WithCreateAudit(userName);
 
             context.FormComponentTemplates.Add(copy);
             context.SaveChanges();
         }
-        public void Delete(string userName)
+
+
+        // ==============================
+        // DELETE (cascade)  *ไม่เปลี่ยน signature*
+        // ==============================
+        public void Delete(BeautyPagrantContext context, string userName)
         {
             this.WithDeleteAudit(userName);
 
-            if (this.SingleSelection != null)
-                this.SingleSelection.Delete(userName);
+            // singleselection
+            SingleSelection single = this.SingleSelection
+                ?? (this.SingleSelectionId.HasValue
+                    ? context.SingleSelections.FirstOrDefault(x => x.Id == this.SingleSelectionId.Value && !x.IsDelete)
+                    : null);
+            if (single != null) single.Delete(userName);
 
-            if (this.TextFieldNavigation != null)
-                this.TextFieldNavigation.Delete(userName);
+            // textfield
+            TextField textField = this.TextFieldNavigation
+                ?? (this.TextField.HasValue
+                    ? context.TextFields.FirstOrDefault(x => x.Id == this.TextField.Value && !x.IsDelete)
+                    : null);
+            if (textField != null) textField.Delete(userName);
 
-            if (this.Date != null)
-                this.Date.Delete(userName);
+            // date
+            Date date = this.Date
+                ?? (this.DateId.HasValue
+                    ? context.Dates.FirstOrDefault(x => x.Id == this.DateId.Value && !x.IsDelete)
+                    : null);
+            if (date != null) date.Delete(userName);
 
-            if (this.BirthDate != null)
-                this.BirthDate.Delete(userName);
+            // birthdate
+            BirthDate birth = this.BirthDate
+                ?? (this.BirthDateId.HasValue
+                    ? context.BirthDates.FirstOrDefault(x => x.Id == this.BirthDateId.Value && !x.IsDelete)
+                    : null);
+            if (birth != null) birth.Delete(userName);
 
-            if (this.ImageUpload != null)
-                this.ImageUpload.Delete(userName);
+            // imageupload
+            ImageUpload img = this.ImageUpload
+                ?? (this.ImageUploadId.HasValue
+                    ? context.ImageUploads.FirstOrDefault(x => x.Id == this.ImageUploadId.Value && !x.IsDelete)
+                    : null);
+            if (img != null) img.Delete(userName);
 
-            if (this.ImageUploadWithImageContent != null)
-                this.ImageUploadWithImageContent.Delete(userName);
+            // imageuploadwithimagecontent
+            ImageUploadWithImageContent imgWith = this.ImageUploadWithImageContent
+                ?? (this.ImageUploadWithImageContentId.HasValue
+                    ? context.ImageUploadWithImageContents.FirstOrDefault(x => x.Id == this.ImageUploadWithImageContentId.Value && !x.IsDelete)
+                    : null);
+            if (imgWith != null) imgWith.Delete(userName);
 
-            if (this.FormButton != null)
-                this.FormButton.Delete(userName);
+            // formbutton
+            FormButton button = this.FormButton
+                ?? (this.FormButtonId.HasValue
+                    ? context.FormButtons.FirstOrDefault(x => x.Id == this.FormButtonId.Value && !x.IsDelete)
+                    : null);
+            if (button != null) button.Delete(userName);
         }
 
     }

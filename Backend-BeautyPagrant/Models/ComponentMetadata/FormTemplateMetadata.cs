@@ -52,11 +52,6 @@ namespace Backend_BeautyPagrant.Models
             context.FormTemplates.Add(copy);
             context.SaveChanges();
 
-            foreach (FormComponentTemplate originalChild in this.FormComponentTemplates.Where(fc => !fc.IsDelete))
-            {
-                FormComponentTemplate.Duplicate(context, copy, originalChild, userName);
-            }
-
             return copy;
         }
 
